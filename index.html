@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC-VisionFX Studio — AI Video-to-Minecraft Addon FX Engine</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- JSZip for real BP/RP packaging -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Font Awesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans Thai"', 'Inter', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        gh: {
+                            bg: '#0d1117',
+                            panel: '#161b22',
+                            border: '#30363d',
+                            hover: '#21262d',
+                            text: '#c9d1d9',
+                            muted: '#8b949e',
+                            accent: '#58a6ff',
+                            green: '#238636',
+                            greenHover: '#2ea043',
+                            purple: '#8957e5',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            overflow-x: hidden;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
+        }
+        .glass-overlay {
+            background: rgba(22, 27, 34, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        #three-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            outline: none;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 12px rgba(88, 166, 255, 0.25); }
+            50% { box-shadow: 0 0 22px rgba(137, 87, 229, 0.5); }
+        }
+        .ai-glow {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans select-none">
+
+    <!-- Top GitHub-style Developer Header -->
+    <header class="h-14 bg-gh-panel border-b border-gh-border px-4 flex items-center justify-between shrink-0 z-20">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-cubes text-white text-sm"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-bold text-white tracking-tight text-sm sm:text-base">MC-VisionFX Studio</span>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">v2.4 Neural-Particle</span>
+                </div>
+                <p class="text-[11px] text-gh-muted hidden sm:block">AI Video-to-Bedrock Micro-Particle Compiler & 3D Rig Inspector</p>
+            </div>
+        </div>
+
+        <!-- Center Status Pill -->
+        <div class="hidden lg:flex items-center space-x-4 bg-gh-bg px-3 py-1.5 rounded-full border border-gh-border text-xs">
+            <span class="flex items-center text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-ping"></span>
+                Optical-Flow Engine Ready
+            </span>
+            <span class="text-gh-border">|</span>
+            <span class="text-gh-muted font-mono" id="header-particle-stat">Particles: 3,200 (0.018 blk)</span>
+        </div>
+
+        <!-- Export BP & RP Action -->
+        <div class="flex items-center space-x-2">
+            <button onclick="showNotification('รีเซ็ตมุมกล้อง 3D แล้ว', 'info')" id="btn-reset-cam" class="px-3 py-1.5 rounded-md bg-gh-bg hover:bg-gh-hover border border-gh-border text-xs text-gh-text transition flex items-center space-x-1.5" title="Reset Camera">
+                <i class="fa-solid fa-crosshairs text-gh-muted"></i>
+                <span class="hidden md:inline">รีเซ็ตมุมมอง</span>
+            </button>
+            <button onclick="exportMinecraftAddon()" class="px-3.5 py-1.5 rounded-md bg-gh-green hover:bg-gh-greenHover text-white font-medium text-xs transition shadow-md flex items-center space-x-2 cursor-pointer">
+                <i class="fa-solid fa-file-zipper"></i>
+                <span>ส่งออก BP & RP (.zip)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main 3-Column Studio Workspace -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+        
+        <!-- LEFT PANEL: Video Input & AI Computer Vision Engine -->
+        <section class="w-full lg:w-80 xl:w-96 bg-gh-panel border-b lg:border-b-0 lg:border-r border-gh-border flex flex-col shrink-0">
+            <div class="p-3 border-b border-gh-border flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wider text-gh-muted flex items-center">
+                    <i class="fa-solid fa-film mr-2 text-gh-accent"></i> 1. แหล่งวิดีโอ & AI Extraction
+                </span>
+                <span class="text-[11px] font-mono text-gh-muted">CV-SubPixel</span>
+            </div>
+
+            <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                <!-- Video Upload / Source Preview Box -->
+                <div class="space-y-2">
+                    <div class="relative rounded-lg overflow-hidden border border-gh-border bg-black aspect-video group">
+                        <!-- Real Video element (hidden unless user uploads video) -->
+                        <video id="source-video" class="w-full h-full object-cover hidden" loop muted playsinline></video>
+                        <!-- Simulated AI Generative Video Canvas -->
+                        <canvas id="simulated-video-canvas" class="w-full h-full block"></canvas>
+                        
+                        <!-- Overlay Badge -->
+                        <div class="absolute top-2 left-2 bg-black/70 backdrop-blur px-2 py-0.5 rounded text-[10px] font-mono text-blue-300 border border-blue-500/30 flex items-center space-x-1">
+                            <i class="fa-solid fa-video"></i>
+                            <span id="video-source-label">AI Gen: Blue Plasma Aura</span>
+                        </div>
+
+                        <!-- Upload Trigger Overlay -->
+                        <label for="video-upload-input" class="absolute bottom-2 right-2 bg-gh-panel/90 hover:bg-gh-hover text-xs text-white px-2.5 py-1 rounded border border-gh-border cursor-pointer transition flex items-center space-x-1.5 shadow">
+                            <i class="fa-solid fa-upload text-gh-accent"></i>
+                            <span>อัปโหลดวิดีโอ (.mp4/.webm)</span>
+                        </label>
+                        <input type="file" id="video-upload-input" accept="video/mp4,video/webm,video/ogg" class="hidden">
+                    </div>
+
+                    <!-- Preset AI Generated Video Prompts -->
+                    <div>
+                        <label class="text-[11px] text-gh-muted block mb-1.5">หรือเลือกวิดีโอเอฟเฟกต์ที่ AI เจนเนอเรตไว้:</label>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button onclick="selectVideoPreset('plasma')" id="preset-plasma" class="preset-btn active-preset text-left px-2.5 py-1.5 rounded bg-blue-500/15 border border-blue-500/50 text-xs text-blue-200 hover:bg-blue-500/25 transition truncate">
+                                ⚡ พลาสมาออร่าสีฟ้า
+                            </button>
+                            <button onclick="selectVideoPreset('dragon_fire')" id="preset-dragon_fire" class="preset-btn text-left px-2.5 py-1.5 rounded bg-gh-bg border border-gh-border text-xs text-gh-text hover:bg-gh-hover transition truncate">
+                                🔥 ลมหายใจมังกรเพลิง
+                            </button>
+                            <button onclick="selectVideoPreset('void_vortex')" id="preset-void_vortex" class="preset-btn text-left px-2.5 py-1.5 rounded bg-gh-bg border border-gh-border text-xs text-gh-text hover:bg-gh-hover transition truncate">
+                                🌀 พายุหมุนมิติมืด (Void)
+                            </button>
+                            <button onclick="selectVideoPreset('sakura_spirit')" id="preset-sakura_spirit" class="preset-btn text-left px-2.5 py-1.5 rounded bg-gh-bg border border-gh-border text-xs text-gh-text hover:bg-gh-hover transition truncate">
+                                🌸 ละอองซากุระวิญญาณ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Video-to-Particle Extraction Button -->
+                <div class="pt-1">
+                    <button onclick="runAIVideoAnalysis()" id="btn-analyze-video" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium text-xs shadow-lg ai-glow transition flex items-center justify-center space-x-2 cursor-pointer">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>วิเคราะห์วิดีโอ & สร้าง Micro-Particles</span>
+                    </button>
+                    
+                    <!-- Progress & AI Vision Telemetry -->
+                    <div id="analysis-progress-box" class="mt-3 hidden space-y-1.5 bg-gh-bg p-2.5 rounded-lg border border-gh-border">
+                        <div class="flex justify-between text-[11px]">
+                            <span id="analysis-step-text" class="text-blue-400 font-medium">กำลังสกัด Optical Flow...</span>
+                            <span id="analysis-percent" class="font-mono text-gh-muted">0%</span>
+                        </div>
+                        <div class="w-full bg-gh-panel rounded-full h-1.5 overflow-hidden">
+                            <div id="analysis-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-1.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+                        </div>
+                        <div id="analysis-logs" class="text-[10px] font-mono text-gh-muted h-14 overflow-y-auto leading-relaxed pt-1"></div>
+                    </div>
+                </div>
+
+                <!-- Micro-Particle Fine Tuning Sliders -->
+                <div class="border-t border-gh-border pt-3 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-white">พารามิเตอร์ความละเอียดอนุภาค</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">Sub-Pixel</span>
+                    </div>
+
+                    <!-- Attachment Bone Selector -->
+                    <div>
+                        <label class="text-[11px] text-gh-muted flex justify-between mb-1">
+                            <span>ตำแหน่งยึดเกาะบนร่างกาย (Rig Bone)</span>
+                        </label>
+                        <select id="bone-selector" onchange="updateBoneAttachment(this.value)" class="w-full bg-gh-bg border border-gh-border rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-gh-accent">
+                            <option value="right_hand">มือขวา (Right Hand / Weapon Grip)</option>
+                            <option value="left_hand">มือซ้าย (Left Hand / Offhand)</option>
+                            <option value="body_core" selected>ลำตัว / แกนกลาง (Body Core Aura)</option>
+                            <option value="head_crown">ศีรษะ / มงกุฎพลังงาน (Head Crown)</option>
+                            <option value="full_body">ทั่วทั้งร่างกาย (Full Body Engulf)</option>
+                        </select>
+                    </div>
+
+                    <!-- Density Slider -->
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-gh-muted">ความหนาแน่นอนุภาค (Particle Count)</span>
+                            <span id="val-density" class="font-mono text-gh-accent">3,200 เม็ด</span>
+                        </div>
+                        <input type="range" id="slider-density" min="800" max="6000" step="200" value="3200" oninput="updateParticleParams()" class="w-full accent-blue-500 cursor-pointer h-1.5 bg-gh-bg rounded-lg">
+                    </div>
+
+                    <!-- Micro-Scale Slider -->
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-gh-muted">ขนาดเม็ดอนุภาค (Micro Size)</span>
+                            <span id="val-size" class="font-mono text-gh-accent">0.018 block</span>
+                        </div>
+                        <input type="range" id="slider-size" min="0.008" max="0.045" step="0.002" value="0.018" oninput="updateParticleParams()" class="w-full accent-purple-500 cursor-pointer h-1.5 bg-gh-bg rounded-lg">
+                    </div>
+
+                    <!-- Turbulence / Speed Slider -->
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-gh-muted">ความเร็วการไหลเวียน (Flow Velocity)</span>
+                            <span id="val-speed" class="font-mono text-gh-accent">1.2x</span>
+                        </div>
+                        <input type="range" id="slider-speed" min="0.2" max="3.0" step="0.1" value="1.2" oninput="updateParticleParams()" class="w-full accent-emerald-500 cursor-pointer h-1.5 bg-gh-bg rounded-lg">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER VIEWPORT: 3D Minecraft Character & Micro-Particle Canvas -->
+        <section class="flex-1 flex flex-col bg-[#090c10] relative min-h-[420px] lg:min-h-0">
+            <!-- Top Floating Viewport Toolbar -->
+            <div class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                <div class="glass-overlay border border-gh-border rounded-lg px-3 py-1.5 flex items-center space-x-3 pointer-events-auto shadow-lg">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        <span class="text-xs font-medium text-white">3D Character Rig Preview</span>
+                    </div>
+                    <span class="text-gh-border">|</span>
+                    <span id="viewport-bone-badge" class="text-[11px] font-mono text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded">
+                        Bone: body_core
+                    </span>
+                </div>
+
+                <!-- Toggle Controls -->
+                <div class="glass-overlay border border-gh-border rounded-lg p-1 flex items-center space-x-1 pointer-events-auto shadow-lg">
+                    <button onclick="toggleRigSkeleton()" id="btn-toggle-bones" class="px-2.5 py-1 rounded text-[11px] bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30 transition flex items-center space-x-1">
+                        <i class="fa-solid fa-bone"></i>
+                        <span>แสดงจุดยึดกระดูก</span>
+                    </button>
+                    <button onclick="toggleCharacterAnimation()" id="btn-toggle-anim" class="px-2.5 py-1 rounded text-[11px] bg-gh-bg text-gh-text hover:bg-gh-hover transition flex items-center space-x-1">
+                        <i class="fa-solid fa-person-walking"></i>
+                        <span>ท่าทาง: เคลื่อนไหว</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Three.js Canvas Container -->
+            <div id="three-container" class="w-full h-full flex-1 cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Bottom Floating Legend & Camera Hint -->
+            <div class="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
+                <div class="glass-overlay border border-gh-border rounded-lg px-3 py-1.5 text-[11px] text-gh-muted flex items-center space-x-4 pointer-events-auto">
+                    <span><i class="fa-solid fa-rotate mr-1 text-gh-accent"></i> ลากเมาส์/นิ้วเพื่อหมุน 360°</span>
+                    <span class="hidden sm:inline"><i class="fa-solid fa-magnifying-glass mr-1 text-gh-accent"></i> สกรอลล์เพื่อซูมดูความละเอียดเม็ดอนุภาค</span>
+                </div>
+
+                <!-- Color Swatch Quick Picker -->
+                <div class="glass-overlay border border-gh-border rounded-lg px-2.5 py-1.5 flex items-center space-x-1.5 pointer-events-auto">
+                    <span class="text-[10px] text-gh-muted mr-1 hidden sm:inline">โทนสีหลัก:</span>
+                    <button onclick="setEffectColor('#00d2ff', '#3a7bd5', 'ฟ้าพลาสมา')" class="w-4 h-4 rounded-full bg-cyan-400 border border-white/40 hover:scale-125 transition" title="ฟ้าพลาสมา"></button>
+                    <button onclick="setEffectColor('#ff512f', '#f09819', 'ส้มเพลิงมังกร')" class="w-4 h-4 rounded-full bg-orange-500 border border-white/40 hover:scale-125 transition" title="ส้มเพลิงมังกร"></button>
+                    <button onclick="setEffectColor('#b92b27', '#8e2de2', 'ม่วงมิติมืด')" class="w-4 h-4 rounded-full bg-purple-500 border border-white/40 hover:scale-125 transition" title="ม่วงมิติมืด"></button>
+                    <button onclick="setEffectColor('#ff758c', '#ff7eb3', 'ชมพูซากุระ')" class="w-4 h-4 rounded-full bg-pink-400 border border-white/40 hover:scale-125 transition" title="ชมพูซากุระ"></button>
+                    <button onclick="setEffectColor('#11998e', '#38ef7d', 'เขียวมรกต')" class="w-4 h-4 rounded-full bg-emerald-400 border border-white/40 hover:scale-125 transition" title="เขียวมรกต"></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: AI Developer Chat & Live BP/RP Code Inspector -->
+        <section class="w-full lg:w-96 xl:w-[430px] bg-gh-panel border-t lg:border-t-0 lg:border-l border-gh-border flex flex-col shrink-0">
+            <!-- Tabs Header -->
+            <div class="flex border-b border-gh-border bg-gh-bg/50">
+                <button onclick="switchRightTab('chat')" id="tab-btn-chat" class="flex-1 py-2.5 px-3 text-xs font-medium border-b-2 border-gh-accent text-white flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-robot text-gh-accent"></i>
+                    <span>AI สั่งแก้ไขเอฟเฟกต์ (Chat)</span>
+                </button>
+                <button onclick="switchRightTab('code')" id="tab-btn-code" class="flex-1 py-2.5 px-3 text-xs font-medium border-b-2 border-transparent text-gh-muted hover:text-white flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-code text-purple-400"></i>
+                    <span>ไฟล์โค้ด BP & RP</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: AI Developer Chat Assistant -->
+            <div id="right-tab-chat" class="flex-1 flex flex-col overflow-hidden">
+                <!-- Chat Messages Area -->
+                <div id="chat-messages" class="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs">
+                    <!-- Initial AI Greeting -->
+                    <div class="flex items-start space-x-2.5">
+                        <div class="w-7 h-7 rounded-md bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <i class="fa-solid fa-microchip text-white text-xs"></i>
+                        </div>
+                        <div class="bg-gh-bg border border-gh-border rounded-lg p-3 text-gh-text leading-relaxed shadow-sm">
+                            <p class="font-semibold text-white mb-1">สวัสดีครับ! ผมคือ AI วิศวกรเอฟเฟกต์ Minecraft Addon</p>
+                            <p class="text-gh-muted">ผมได้แปลงวิดีโอเป็นกลุ่ม <span class="text-blue-400 font-mono">Micro-Particles</span> ความละเอียดสูงให้แล้ว คุณสามารถตรวจสอบตำแหน่งบนตัวละคร 3D และพิมพ์สั่งแก้ไขได้ทันที เช่น:</p>
+                            <ul class="list-disc list-inside text-[11px] text-gh-muted mt-1.5 space-y-0.5">
+                                <li>"ย้ายเอฟเฟกต์ไปรวมที่มือขวา"</li>
+                                <li>"เปลี่ยนสีเป็นม่วงนีออนและเพิ่มอนุภาคให้ละเอียดขึ้น"</li>
+                                <li>"ทำให้หมุนเป็นพายุเกลียวรอบตัวเร็วขึ้น"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Prompt Chips -->
+                <div class="px-3 py-2 border-t border-gh-border bg-gh-bg/40 flex gap-1.5 overflow-x-auto no-scrollbar">
+                    <button onclick="sendQuickPrompt('ย้ายไปที่มือขวา')" class="shrink-0 text-[11px] px-2.5 py-1 rounded-full bg-gh-bg hover:bg-gh-hover border border-gh-border text-gh-text transition">
+                        ✋ ย้ายไปมือขวา
+                    </button>
+                    <button onclick="sendQuickPrompt('เปลี่ยนสีเป็นสีทองเปล่งประกาย')" class="shrink-0 text-[11px] px-2.5 py-1 rounded-full bg-gh-bg hover:bg-gh-hover border border-gh-border text-gh-text transition">
+                        ✨ สีทองเปล่งประกาย
+                    </button>
+                    <button onclick="sendQuickPrompt('ทำเป็นพายุหมุนเกลียวรอบตัว')" class="shrink-0 text-[11px] px-2.5 py-1 rounded-full bg-gh-bg hover:bg-gh-hover border border-gh-border text-gh-text transition">
+                        🌪️ พายุหมุนเกลียว
+                    </button>
+                    <button onclick="sendQuickPrompt('เพิ่มความละเอียดอนุภาคสูงสุด')" class="shrink-0 text-[11px] px-2.5 py-1 rounded-full bg-gh-bg hover:bg-gh-hover border border-gh-border text-gh-text transition">
+                        🔬 ละเอียดสูงสุด (6000)
+                    </button>
+                </div>
+
+                <!-- Chat Input Box -->
+                <form onsubmit="handleChatSubmit(event)" class="p-3 border-t border-gh-border bg-gh-panel flex items-center space-x-2">
+                    <input type="text" id="chat-input" placeholder="พิมพ์คำสั่งแก้ไขเอฟเฟกต์ เช่น 'เปลี่ยนเป็นสีแดงเพลิงที่มือซ้าย'..." class="flex-1 bg-gh-bg border border-gh-border rounded-lg px-3 py-2 text-xs text-white placeholder-gh-muted focus:outline-none focus:border-gh-accent">
+                    <button type="submit" class="px-3.5 py-2 rounded-lg bg-gh-accent hover:bg-blue-500 text-gh-bg font-semibold text-xs transition flex items-center justify-center cursor-pointer">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+
+            <!-- TAB 2: Live BP & RP JSON Code Inspector -->
+            <div id="right-tab-code" class="hidden flex-1 flex flex-col overflow-hidden">
+                <!-- File Selector Bar -->
+                <div class="p-2 bg-gh-bg border-b border-gh-border flex items-center justify-between gap-2">
+                    <select id="code-file-selector" onchange="renderSelectedCodeFile()" class="bg-gh-panel border border-gh-border rounded px-2 py-1 text-[11px] font-mono text-blue-300 focus:outline-none flex-1">
+                        <option value="rp_particle">RP/particles/visionfx_micro.particle.json</option>
+                        <option value="bp_entity">BP/entities/player.json (Controller)</option>
+                        <option value="rp_anim_ctrl">RP/animation_controllers/fx.ac.json</option>
+                        <option value="rp_manifest">RP/manifest.json</option>
+                        <option value="bp_manifest">BP/manifest.json</option>
+                    </select>
+                    <button onclick="copyCurrentCode()" class="px-2.5 py-1 rounded bg-gh-panel hover:bg-gh-hover border border-gh-border text-[11px] text-gh-text flex items-center space-x-1">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>คัดลอก</span>
+                    </button>
+                </div>
+
+                <!-- Code Viewer -->
+                <div class="flex-1 overflow-auto p-3 bg-[#0d1117] font-mono text-[11px] leading-relaxed">
+                    <pre id="code-viewer-content" class="text-emerald-300 whitespace-pre-wrap break-all"></pre>
+                </div>
+
+                <!-- Bottom Export Reminder -->
+                <div class="p-2.5 border-t border-gh-border bg-gh-bg/60 flex items-center justify-between text-[11px]">
+                    <span class="text-gh-muted"><i class="fa-solid fa-check-circle text-emerald-400 mr-1"></i> Bedrock Format 1.20.80+ Valid</span>
+                    <button onclick="exportMinecraftAddon()" class="text-gh-accent hover:underline font-medium">ดาวน์โหลดแพ็กเกจทั้งหมด (.zip)</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Custom Toast Notification Banner (No alert() used) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+        // ============================================================================
+        // 1. GLOBAL APPLICATION STATE (MC-VisionFX Core)
+        // ============================================================================
+        const fxState = {
+            preset: 'plasma',
+            effectName: 'visionfx:plasma_aura',
+            primaryColor: '#00d2ff',
+            secondaryColor: '#3a7bd5',
+            colorName: 'ฟ้าพลาสมา',
+            bone: 'body_core', // right_hand, left_hand, body_core, head_crown, full_body
+            particleCount: 3200,
+            particleSize: 0.018, // in Minecraft blocks (ultra-fine micro-particles)
+            speed: 1.2,
+            pattern: 'aura_vortex', // aura_vortex, stream_jet, spiral_tornado, petal_swirl
+            spreadRadius: 0.65,
+            showBones: true,
+            animateCharacter: true,
+            isVideoUploaded: false
+        };
+
+        // ============================================================================
+        // 2. SIMULATED AI VIDEO SOURCE CANVAS & VIDEO UPLOAD HANDLER
+        // ============================================================================
+        const simCanvas = document.getElementById('simulated-video-canvas');
+        const simCtx = simCanvas.getContext('2d');
+        const sourceVideo = document.getElementById('source-video');
+        let simParticles = [];
+
+        function initSimVideoCanvas() {
+            simCanvas.width = 400;
+            simCanvas.height = 225;
+            simParticles = Array.from({ length: 140 }, () => ({
+                x: Math.random() * simCanvas.width,
+                y: Math.random() * simCanvas.height,
+                r: Math.random() * 2.5 + 0.5,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 2.5 - 0.5,
+                alpha: Math.random()
+            }));
+        }
+
+        function renderSimVideoFrame() {
+            if (!fxState.isVideoUploaded) {
+                simCtx.fillStyle = 'rgba(8, 12, 20, 0.22)';
+                simCtx.fillRect(0, 0, simCanvas.width, simCanvas.height);
+
+                const cx = simCanvas.width / 2;
+                const cy = simCanvas.height / 2;
+                const time = Date.now() * 0.003 * fxState.speed;
+
+                simParticles.forEach((p, idx) => {
+                    if (fxState.pattern === 'spiral_tornado' || fxState.preset === 'void_vortex') {
+                        const angle = time + idx * 0.15;
+                        const radius = 20 + (idx % 60) * 1.2;
+                        p.x = cx + Math.cos(angle) * radius;
+                        p.y = cy + Math.sin(angle) * (radius * 0.45) + Math.sin(time * 2 + idx) * 15;
+                    } else if (fxState.preset === 'dragon_fire') {
+                        p.x += 3.5 * fxState.speed;
+                        p.y += Math.sin(time + idx) * 1.5;
+                        if (p.x > simCanvas.width) { p.x = 40; p.y = cy + (Math.random() - 0.5) * 30; }
+                    } else {
+                        p.x += Math.sin(time + idx) * 1.2;
+                        p.y += p.vy * fxState.speed;
+                        if (p.y < 0) { p.y = simCanvas.height; p.x = cx + (Math.random() - 0.5) * 140; }
+                    }
+
+                    simCtx.beginPath();
+                    simCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    simCtx.fillStyle = idx % 2 === 0 ? fxState.primaryColor : fxState.secondaryColor;
+                    simCtx.globalAlpha = 0.75;
+                    simCtx.fill();
+                });
+                simCtx.globalAlpha = 1.0;
+
+                // Scanline AI Vision Overlay
+                const scanY = (Date.now() * 0.08) % simCanvas.height;
+                simCtx.strokeStyle = 'rgba(88, 166, 255, 0.35)';
+                simCtx.lineWidth = 1;
+                simCtx.beginPath();
+                simCtx.moveTo(0, scanY);
+                simCtx.lineTo(simCanvas.width, scanY);
+                simCtx.stroke();
+            }
+            requestAnimationFrame(renderSimVideoFrame);
+        }
+
+        // Handle User Uploading Custom Video
+        document.getElementById('video-upload-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            sourceVideo.src = url;
+            sourceVideo.classList.remove('hidden');
+            simCanvas.classList.add('hidden');
+            sourceVideo.play();
+            fxState.isVideoUploaded = true;
+            document.getElementById('video-source-label').textContent = `Video: ${file.name.slice(0, 22)}`;
+            showNotification(`โหลดวิดีโอ "${file.name}" สำเร็จ กดวิเคราะห์เพื่อสร้างเอฟเฟกต์`, 'success');
+            runAIVideoAnalysis();
+        });
+
+        function selectVideoPreset(presetKey) {
+            fxState.isVideoUploaded = false;
+            sourceVideo.pause();
+            sourceVideo.classList.add('hidden');
+            simCanvas.classList.remove('hidden');
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-500/15', 'border-blue-500/50', 'text-blue-200');
+                btn.classList.add('bg-gh-bg', 'border-gh-border', 'text-gh-text');
+            });
+            const activeBtn = document.getElementById(`preset-${presetKey}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-gh-bg', 'border-gh-border', 'text-gh-text');
+                activeBtn.classList.add('bg-blue-500/15', 'border-blue-500/50', 'text-blue-200');
+            }
+
+            fxState.preset = presetKey;
+            if (presetKey === 'plasma') {
+                fxState.primaryColor = '#00d2ff';
+                fxState.secondaryColor = '#3a7bd5';
+                fxState.colorName = 'ฟ้าพลาสมา';
+                fxState.pattern = 'aura_vortex';
+                fxState.bone = 'body_core';
+                document.getElementById('video-source-label').textContent = 'AI Gen: Blue Plasma Aura';
+            } else if (presetKey === 'dragon_fire') {
+                fxState.primaryColor = '#ff512f';
+                fxState.secondaryColor = '#f09819';
+                fxState.colorName = 'เพลิงมังกร';
+                fxState.pattern = 'stream_jet';
+                fxState.bone = 'right_hand';
+                document.getElementById('video-source-label').textContent = 'AI Gen: Dragon Flame Breath';
+            } else if (presetKey === 'void_vortex') {
+                fxState.primaryColor = '#a855f7';
+                fxState.secondaryColor = '#4c1d95';
+                fxState.colorName = 'ม่วงมิติมืด';
+                fxState.pattern = 'spiral_tornado';
+                fxState.bone = 'full_body';
+                document.getElementById('video-source-label').textContent = 'AI Gen: Void Lightning Vortex';
+            } else if (presetKey === 'sakura_spirit') {
+                fxState.primaryColor = '#ff758c';
+                fxState.secondaryColor = '#ffd1dc';
+                fxState.colorName = 'ชมพูซากุระ';
+                fxState.pattern = 'petal_swirl';
+                fxState.bone = 'head_crown';
+                document.getElementById('video-source-label').textContent = 'AI Gen: Cherry Blossom Spirit';
+            }
+
+            document.getElementById('bone-selector').value = fxState.bone;
+            updateBoneAttachment(fxState.bone);
+            rebuildMicroParticleSystem();
+            renderSelectedCodeFile();
+        }
+
+        // Simulated AI Computer Vision Extraction Process
+        function runAIVideoAnalysis() {
+            const box = document.getElementById('analysis-progress-box');
+            const bar = document.getElementById('analysis-bar');
+            const pct = document.getElementById('analysis-percent');
+            const stepText = document.getElementById('analysis-step-text');
+            const logs = document.getElementById('analysis-logs');
+
+            box.classList.remove('hidden');
+            logs.innerHTML = '';
+            let progress = 0;
+
+            const steps = [
+                { p: 20, msg: 'กำลังแยกเฟรมวิดีโอ 60FPS & ตรวจจับค่าความสว่าง Luminance...', log: '[CV-Engine] Extracted 120 keyframes (1920x1080)' },
+                { p: 45, msg: 'คำนวณเวกเตอร์การไหล Optical Flow & ความเร็วอนุภาค...', log: '[OpticalFlow] Velocity field mapped: curl_noise + upward_buoyancy' },
+                { p: 75, msg: 'สังเคราะห์ Micro-Particles ระดับ Sub-Pixel (0.018 blocks)...', log: `[NeuralMesh] Generated ${fxState.particleCount} micro-particles with volumetric cohesion` },
+                { p: 100, msg: 'คอมไพล์ Molang & Bedrock Particle JSON เสร็จสมบูรณ์!', log: '[Compiler] Bound to Minecraft Rig Bone: ' + fxState.bone }
+            ];
+
+            let stepIdx = 0;
+            const interval = setInterval(() => {
+                progress += 5;
+                bar.style.width = `${progress}%`;
+                pct.textContent = `${progress}%`;
+
+                if (stepIdx < steps.length && progress >= steps[stepIdx].p) {
+                    stepText.textContent = steps[stepIdx].msg;
+                    logs.innerHTML += `<div>> ${steps[stepIdx].log}</div>`;
+                    logs.scrollTop = logs.scrollHeight;
+                    stepIdx++;
+                }
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    rebuildMicroParticleSystem();
+                    renderSelectedCodeFile();
+                    showNotification('AI สร้างโมเดล Micro-Particles จากวิดีโอเรียบร้อยแล้ว!', 'success');
+                }
+            }, 65);
+        }
+
+        // ============================================================================
+        // 3. THREE.JS 3D MINECRAFT CHARACTER RIG & MICRO-PARTICLE SYSTEM
+        // ============================================================================
+        let scene, camera, renderer, characterGroup, particleSystem, particleGeo, particleMat;
+        let boneMarkers = {};
+        let characterParts = {};
+        let particleData = [];
+        let clock = new THREE.Clock();
+
+        // Camera Orbit Controls State (Custom lightweight smooth orbit)
+        let isDragging = false;
+        let prevMouse = { x: 0, y: 0 };
+        let camSpherical = { radius: 4.2, theta: 0.45, phi: 1.25 };
+
+        function initThreeJS() {
+            const container = document.getElementById('three-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#090c10');
+            scene.fog = new THREE.FogExp2('#090c10', 0.08);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            updateCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Studio Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+            dirLight.position.set(4, 8, 5);
+            scene.add(dirLight);
+
+            const rimLight = new THREE.DirectionalLight(0x58a6ff, 0.45);
+            rimLight.position.set(-4, 3, -5);
+            scene.add(rimLight);
+
+            // Minecraft Block Floor Grid
+            const gridHelper = new THREE.GridHelper(12, 12, 0x30363d, 0x161b22);
+            scene.add(gridHelper);
+
+            // Build Articulated Minecraft Character Rig
+            buildMinecraftCharacter();
+
+            // Build High-Density Micro-Particle System
+            rebuildMicroParticleSystem();
+
+            // Setup Mouse & Touch Orbit Controls
+            setupOrbitControls(container);
+
+            // Handle Window Resize
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('btn-reset-cam').addEventListener('click', () => {
+                camSpherical = { radius: 4.2, theta: 0.45, phi: 1.25 };
+                updateCameraPosition();
+            });
+        }
+
+        function createMinecraftPartMaterial(colorHex, detailColorHex) {
+            // Procedural pixel texture canvas for crisp Minecraft look
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = colorHex;
+            ctx.fillRect(0, 0, 16, 16);
+            ctx.fillStyle = detailColorHex;
+            for (let i = 0; i < 18; i++) {
+                ctx.fillRect(Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), 1, 1);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            return new THREE.MeshLambertMaterial({ map: tex });
+        }
+
+        function buildMinecraftCharacter() {
+            characterGroup = new THREE.Group();
+            // 1 Minecraft Block = 1.0 unit (Player height ~ 2.0 blocks = 32 pixels, 1 pixel = 0.0625)
+            const px = 0.0625;
+
+            // Materials (Steve-inspired developer palette)
+            const skinMat = createMinecraftPartMaterial('#c68c65', '#b57b54');
+            const shirtMat = createMinecraftPartMaterial('#00a8a8', '#008f8f');
+            const pantsMat = createMinecraftPartMaterial('#3b3bb3', '#2e2e94');
+            const hairMat = createMinecraftPartMaterial('#3b2716', '#2a1b0e');
+
+            // Head (8x8x8 px)
+            const headGeo = new THREE.BoxGeometry(8 * px, 8 * px, 8 * px);
+            const headMesh = new THREE.Mesh(headGeo, skinMat);
+            headMesh.position.y = 28 * px;
+            
+            // Eyes & Hair detail on Head
+            const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const eyePupilMat = new THREE.MeshBasicMaterial({ color: 0x3b2799 });
+            const eyeL = new THREE.Mesh(new THREE.BoxGeometry(1 * px, 1 * px, 0.2 * px), eyeWhiteMat);
+            eyeL.position.set(-2 * px, 0, 4.05 * px);
+            const pupilL = new THREE.Mesh(new THREE.BoxGeometry(1 * px, 1 * px, 0.25 * px), eyePupilMat);
+            pupilL.position.set(-1.2 * px, 0, 4.06 * px);
+
+            const eyeR = new THREE.Mesh(new THREE.BoxGeometry(1 * px, 1 * px, 0.2 * px), eyeWhiteMat);
+            eyeR.position.set(2 * px, 0, 4.05 * px);
+            const pupilR = new THREE.Mesh(new THREE.BoxGeometry(1 * px, 1 * px, 0.25 * px), eyePupilMat);
+            pupilR.position.set(1.2 * px, 0, 4.06 * px);
+
+            const hairCap = new THREE.Mesh(new THREE.BoxGeometry(8.2 * px, 2.2 * px, 8.2 * px), hairMat);
+            hairCap.position.set(0, 3.1 * px, 0);
+
+            headMesh.add(eyeL, pupilL, eyeR, pupilR, hairCap);
+            characterParts.head = headMesh;
+
+            // Torso (8x12x4 px)
+            const torsoGeo = new THREE.BoxGeometry(8 * px, 12 * px, 4 * px);
+            const torsoMesh = new THREE.Mesh(torsoGeo, shirtMat);
+            torsoMesh.position.y = 18 * px;
+            characterParts.torso = torsoMesh;
+
+            // Right Arm (4x12x4 px) - Pivoted at shoulder
+            const rightArmGroup = new THREE.Group();
+            rightArmGroup.position.set(-6 * px, 22 * px, 0);
+            const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(4 * px, 12 * px, 4 * px), skinMat);
+            rightArmMesh.position.y = -4 * px;
+            const rightSleeve = new THREE.Mesh(new THREE.BoxGeometry(4.1 * px, 4 * px, 4.1 * px), shirtMat);
+            rightSleeve.position.y = 0;
+            rightArmGroup.add(rightArmMesh, rightSleeve);
+            characterParts.rightArm = rightArmGroup;
+
+            // Left Arm (4x12x4 px) - Pivoted at shoulder
+            const leftArmGroup = new THREE.Group();
+            leftArmGroup.position.set(6 * px, 22 * px, 0);
+            const leftArmMesh = new THREE.Mesh(new THREE.BoxGeometry(4 * px, 12 * px, 4 * px), skinMat);
+            leftArmMesh.position.y = -4 * px;
+            const leftSleeve = new THREE.Mesh(new THREE.BoxGeometry(4.1 * px, 4 * px, 4.1 * px), shirtMat);
+            leftSleeve.position.y = 0;
+            leftArmGroup.add(leftArmMesh, leftSleeve);
+            characterParts.leftArm = leftArmGroup;
+
+            // Right Leg (4x12x4 px)
+            const rightLegGroup = new THREE.Group();
+            rightLegGroup.position.set(-2 * px, 12 * px, 0);
+            const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(4 * px, 12 * px, 4 * px), pantsMat);
+            rightLegMesh.position.y = -6 * px;
+            rightLegGroup.add(rightLegMesh);
+            characterParts.rightLeg = rightLegGroup;
+
+            // Left Leg (4x12x4 px)
+            const leftLegGroup = new THREE.Group();
+            leftLegGroup.position.set(2 * px, 12 * px, 0);
+            const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(4 * px, 12 * px, 4 * px), pantsMat);
+            leftLegMesh.position.y = -6 * px;
+            leftLegGroup.add(leftLegMesh);
+            characterParts.leftLeg = leftLegGroup;
+
+            characterGroup.add(headMesh, torsoMesh, rightArmGroup, leftArmGroup, rightLegGroup, leftLegGroup);
+
+            // Create Glowing Bone Attachment Markers (Visualizing where the FX attaches)
+            const markerGeo = new THREE.SphereGeometry(0.08, 12, 12);
+            const createMarker = (name, parent, x, y, z) => {
+                const mat = new THREE.MeshBasicMaterial({ color: 0x58a6ff, wireframe: true });
+                const mesh = new THREE.Mesh(markerGeo, mat);
+                mesh.position.set(x, y, z);
+                parent.add(mesh);
+                boneMarkers[name] = mesh;
+            };
+
+            createMarker('right_hand', rightArmGroup, 0, -9.5 * px, 0.05);
+            createMarker('left_hand', leftArmGroup, 0, -9.5 * px, 0.05);
+            createMarker('body_core', torsoMesh, 0, 0, 0);
+            createMarker('head_crown', headMesh, 0, 5.5 * px, 0);
+            createMarker('full_body', characterGroup, 0, 1.0, 0);
+
+            scene.add(characterGroup);
+            highlightActiveBoneMarker();
+        }
+
+        function highlightActiveBoneMarker() {
+            Object.keys(boneMarkers).forEach(key => {
+                const m = boneMarkers[key];
+                m.visible = fxState.showBones;
+                if (key === fxState.bone) {
+                    m.material.color.setHex(0xff007f);
+                    m.scale.set(1.5, 1.5, 1.5);
+                } else {
+                    m.material.color.setHex(0x58a6ff);
+                    m.scale.set(0.85, 0.85, 0.85);
+                }
+            });
+        }
+
+        // Create Soft Glowing Micro-Particle Sprite Texture (so particles blend into cohesive silky clouds/streams)
+        function createMicroParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.85)');
+            grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.25)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Build High-Density Micro-Particle System
+        function rebuildMicroParticleSystem() {
+            if (particleSystem) {
+                scene.remove(particleSystem);
+                particleGeo.dispose();
+                particleMat.dispose();
+            }
+
+            const count = fxState.particleCount;
+            particleGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            particleData = [];
+
+            const c1 = new THREE.Color(fxState.primaryColor);
+            const c2 = new THREE.Color(fxState.secondaryColor);
+
+            for (let i = 0; i < count; i++) {
+                const ratio = Math.random();
+                const mixedColor = c1.clone().lerp(c2, ratio);
+
+                colors[i * 3] = mixedColor.r;
+                colors[i * 3 + 1] = mixedColor.g;
+                colors[i * 3 + 2] = mixedColor.b;
+
+                // Store individual particle orbital/flow state for ultra-fine fluid cohesion
+                particleData.push({
+                    angle: Math.random() * Math.PI * 2,
+                    radius: Math.random() * fxState.spreadRadius,
+                    heightOffset: (Math.random() - 0.5) * 1.4,
+                    speedOffset: 0.6 + Math.random() * 0.9,
+                    phase: Math.random() * Math.PI * 2,
+                    life: Math.random()
+                });
+
+                positions[i * 3] = 0;
+                positions[i * 3 + 1] = 1;
+                positions[i * 3 + 2] = 0;
+            }
+
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            particleMat = new THREE.PointsMaterial({
+                size: fxState.particleSize * 3.2, // scaled visually for Three.js world space while keeping micro-grain look
+                map: createMicroParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.88,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleSystem = new THREE.Points(particleGeo, particleMat);
+            scene.add(particleSystem);
+
+            // Update header stat
+            document.getElementById('header-particle-stat').textContent = 
+                `Particles: ${fxState.particleCount.toLocaleString()} (${fxState.particleSize} blk)`;
+        }
+
+        function getTargetBoneWorldPosition() {
+            const targetPos = new THREE.Vector3(0, 1.1, 0);
+            const marker = boneMarkers[fxState.bone];
+            if (marker) {
+                marker.getWorldPosition(targetPos);
+            }
+            return targetPos;
+        }
+
+        function updateMicroParticlesAnimation(elapsedTime, delta) {
+            if (!particleSystem || !particleGeo) return;
+
+            const positions = particleGeo.attributes.position.array;
+            const anchor = getTargetBoneWorldPosition();
+            const spd = fxState.speed;
+
+            // Scale spread based on bone type (hands have tighter concentrated energy, full body is wider)
+            let localScale = 1.0;
+            if (fxState.bone === 'right_hand' || fxState.bone === 'left_hand') localScale = 0.42;
+            else if (fxState.bone === 'head_crown') localScale = 0.55;
+            else if (fxState.bone === 'full_body') localScale = 1.35;
+
+            for (let i = 0; i < fxState.particleCount; i++) {
+                const p = particleData[i];
+                p.life += delta * 0.55 * spd * p.speedOffset;
+                if (p.life > 1.0) p.life -= 1.0;
+
+                const t = elapsedTime * spd * p.speedOffset + p.phase;
+                let x = 0, y = 0, z = 0;
+
+                if (fxState.pattern === 'stream_jet') {
+                    // Concentrated energy stream / flame jet shooting forward & upward from bone
+                    const dist = p.life * 1.6 * localScale;
+                    const coneSpread = p.life * 0.35 * localScale;
+                    x = Math.cos(p.angle + t * 2) * coneSpread;
+                    y = Math.sin(p.angle + t * 2) * coneSpread + (p.life * 0.35);
+                    z = dist;
+                } else if (fxState.pattern === 'spiral_tornado') {
+                    // High-speed helical vortex tornado
+                    const h = (p.life - 0.3) * 1.8 * localScale;
+                    const r = (0.15 + Math.abs(h) * 0.45) * localScale * (0.7 + 0.3 * Math.sin(p.phase));
+                    const theta = p.angle + elapsedTime * 4.5 * spd + h * 4.0;
+                    x = Math.cos(theta) * r;
+                    y = h;
+                    z = Math.sin(theta) * r;
+                } else if (fxState.pattern === 'petal_swirl') {
+                    // Gentle floating orbital ring / crown swirl
+                    const r = (0.35 + Math.sin(p.phase) * 0.25) * localScale;
+                    const theta = p.angle + elapsedTime * 1.4 * spd;
+                    x = Math.cos(theta) * r;
+                    y = Math.sin(t * 1.8) * 0.35 * localScale + (p.life - 0.5) * 0.4;
+                    z = Math.sin(theta) * r;
+                } else {
+                    // Default: Cohesive Volumetric Aura (sub-pixel micro particles hugging & rising around target)
+                    const r = (0.22 + p.radius * 0.65) * localScale * (1.0 - p.life * 0.35);
+                    const theta = p.angle + elapsedTime * 2.2 * spd;
+                    x = Math.cos(theta) * r + Math.sin(t * 3) * 0.04;
+                    y = (p.life - 0.35) * 1.25 * localScale;
+                    z = Math.sin(theta) * r + Math.cos(t * 3) * 0.04;
+                }
+
+                positions[i * 3] = anchor.x + x;
+                positions[i * 3 + 1] = anchor.y + y;
+                positions[i * 3 + 2] = anchor.z + z;
+            }
+
+            particleGeo.attributes.position.needsUpdate = true;
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+
+            // Subtle Minecraft Character Idle / Combat Pose Animation
+            if (characterGroup && fxState.animateCharacter) {
+                characterGroup.position.y = Math.sin(elapsedTime * 2.2) * 0.025;
+                if (fxState.bone === 'right_hand') {
+                    // Raise right arm forward like casting magic / holding weapon
+                    characterParts.rightArm.rotation.x = THREE.MathUtils.lerp(characterParts.rightArm.rotation.x, -1.25 + Math.sin(elapsedTime * 3) * 0.06, 0.1);
+                    characterParts.leftArm.rotation.x = THREE.MathUtils.lerp(characterParts.leftArm.rotation.x, Math.sin(elapsedTime * 2) * 0.1, 0.1);
+                } else if (fxState.bone === 'left_hand') {
+                    characterParts.leftArm.rotation.x = THREE.MathUtils.lerp(characterParts.leftArm.rotation.x, -1.25 + Math.sin(elapsedTime * 3) * 0.06, 0.1);
+                    characterParts.rightArm.rotation.x = THREE.MathUtils.lerp(characterParts.rightArm.rotation.x, Math.sin(elapsedTime * 2) * 0.1, 0.1);
+                } else {
+                    characterParts.rightArm.rotation.x = THREE.MathUtils.lerp(characterParts.rightArm.rotation.x, Math.sin(elapsedTime * 2) * 0.15, 0.1);
+                    characterParts.leftArm.rotation.x = THREE.MathUtils.lerp(characterParts.leftArm.rotation.x, -Math.sin(elapsedTime * 2) * 0.15, 0.1);
+                }
+                characterParts.head.rotation.y = Math.sin(elapsedTime * 1.1) * 0.12;
+            }
+
+            updateMicroParticlesAnimation(elapsedTime, delta);
+            renderer.render(scene, camera);
+        }
+
+        // Orbit Camera Helpers
+        function updateCameraPosition() {
+            const target = new THREE.Vector3(0, 1.05, 0);
+            camera.position.x = target.x + camSpherical.radius * Math.sin(camSpherical.phi) * Math.sin(camSpherical.theta);
+            camera.position.y = target.y + camSpherical.radius * Math.cos(camSpherical.phi);
+            camera.position.z = target.z + camSpherical.radius * Math.sin(camSpherical.phi) * Math.cos(camSpherical.theta);
+            camera.lookAt(target);
+        }
+
+        function setupOrbitControls(domElement) {
+            domElement.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - prevMouse.x;
+                const dy = e.clientY - prevMouse.y;
+                camSpherical.theta -= dx * 0.008;
+                camSpherical.phi = Math.max(0.25, Math.min(Math.PI - 0.25, camSpherical.phi - dy * 0.008));
+                updateCameraPosition();
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+            domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camSpherical.radius = Math.max(1.5, Math.min(9.0, camSpherical.radius + e.deltaY * 0.003));
+                updateCameraPosition();
+            }, { passive: false });
+
+            // Touch Support
+            domElement.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    isDragging = true;
+                    prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            }, { passive: true });
+            domElement.addEventListener('touchend', () => isDragging = false);
+            domElement.addEventListener('touchmove', (e) => {
+                if (!isDragging || e.touches.length !== 1) return;
+                const dx = e.touches[0].clientX - prevMouse.x;
+                const dy = e.touches[0].clientY - prevMouse.y;
+                camSpherical.theta -= dx * 0.01;
+                camSpherical.phi = Math.max(0.25, Math.min(Math.PI - 0.25, camSpherical.phi - dy * 0.01));
+                updateCameraPosition();
+                prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }, { passive: true });
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('three-container');
+            if (!container || !renderer || !camera) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // ============================================================================
+        // 4. UI CONTROLS & PARAMETER UPDATERS
+        // ============================================================================
+        function updateBoneAttachment(boneVal) {
+            fxState.bone = boneVal;
+            document.getElementById('viewport-bone-badge').textContent = `Bone: ${boneVal}`;
+            highlightActiveBoneMarker();
+            renderSelectedCodeFile();
+        }
+
+        function updateParticleParams() {
+            const density = parseInt(document.getElementById('slider-density').value);
+            const size = parseFloat(document.getElementById('slider-size').value);
+            const speed = parseFloat(document.getElementById('slider-speed').value);
+
+            fxState.particleCount = density;
+            fxState.particleSize = size;
+            fxState.speed = speed;
+
+            document.getElementById('val-density').textContent = `${density.toLocaleString()} เม็ด`;
+            document.getElementById('val-size').textContent = `${size} block`;
+            document.getElementById('val-speed').textContent = `${speed.toFixed(1)}x`;
+
+            rebuildMicroParticleSystem();
+            renderSelectedCodeFile();
+        }
+
+        function setEffectColor(primary, secondary, labelName) {
+            fxState.primaryColor = primary;
+            fxState.secondaryColor = secondary;
+            fxState.colorName = labelName;
+            rebuildMicroParticleSystem();
+            renderSelectedCodeFile();
+            showNotification(`เปลี่ยนสีเอฟเฟกต์เป็น "${labelName}" แล้ว`, 'info');
+        }
+
+        function toggleRigSkeleton() {
+            fxState.showBones = !fxState.showBones;
+            const btn = document.getElementById('btn-toggle-bones');
+            if (fxState.showBones) {
+                btn.classList.add('bg-blue-500/20', 'text-blue-300', 'border-blue-500/40');
+                btn.classList.remove('bg-gh-bg', 'text-gh-muted', 'border-gh-border');
+            } else {
+                btn.classList.remove('bg-blue-500/20', 'text-blue-300', 'border-blue-500/40');
+                btn.classList.add('bg-gh-bg', 'text-gh-muted', 'border-gh-border');
+            }
+            highlightActiveBoneMarker();
+        }
+
+        function toggleCharacterAnimation() {
+            fxState.animateCharacter = !fxState.animateCharacter;
+            const btn = document.getElementById('btn-toggle-anim');
+            btn.innerHTML = fxState.animateCharacter 
+                ? '<i class="fa-solid fa-person-walking"></i><span>ท่าทาง: เคลื่อนไหว</span>'
+                : '<i class="fa-solid fa-person"></i><span>ท่าทาง: ยืนนิ่ง (T-Pose)</span>';
+        }
+
+        function switchRightTab(tab) {
+            const chatPanel = document.getElementById('right-tab-chat');
+            const codePanel = document.getElementById('right-tab-code');
+            const btnChat = document.getElementById('tab-btn-chat');
+            const btnCode = document.getElementById('tab-btn-code');
+
+            if (tab === 'chat') {
+                chatPanel.classList.remove('hidden');
+                codePanel.classList.add('hidden');
+                btnChat.classList.add('border-gh-accent', 'text-white');
+                btnChat.classList.remove('border-transparent', 'text-gh-muted');
+                btnCode.classList.remove('border-gh-accent', 'text-white');
+                btnCode.classList.add('border-transparent', 'text-gh-muted');
+            } else {
+                chatPanel.classList.add('hidden');
+                codePanel.classList.remove('hidden');
+                btnCode.classList.add('border-gh-accent', 'text-white');
+                btnCode.classList.remove('border-transparent', 'text-gh-muted');
+                btnChat.classList.remove('border-gh-accent', 'text-white');
+                btnChat.classList.add('border-transparent', 'text-gh-muted');
+                renderSelectedCodeFile();
+            }
+        }
+
+        // ============================================================================
+        // 5. INTELLIGENT AI DEVELOPER CHAT ENGINE (Natural Language -> 3D + JSON)
+        // ============================================================================
+        function sendQuickPrompt(text) {
+            document.getElementById('chat-input').value = text;
+            handleChatSubmit(new Event('submit'));
+        }
+
+        function handleChatSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            appendChatMessage('user', msg);
+            input.value = '';
+
+            // Simulate AI Developer reasoning and real-time modification
+            setTimeout(() => {
+                const reply = processAICommand(msg);
+                appendChatMessage('ai', reply);
+                rebuildMicroParticleSystem();
+                renderSelectedCodeFile();
+            }, 350);
+        }
+
+        function processAICommand(text) {
+            const lower = text.toLowerCase();
+            let modifications = [];
+
+            // 1. Parse Bone / Body Location
+            if (lower.includes('มือขวา') || lower.includes('right hand')) {
+                fxState.bone = 'right_hand';
+                document.getElementById('bone-selector').value = 'right_hand';
+                updateBoneAttachment('right_hand');
+                modifications.push('ย้ายจุดยึดเอฟเฟกต์ไปที่ **มือขวา (right_hand)**');
+            } else if (lower.includes('มือซ้าย') || lower.includes('left hand')) {
+                fxState.bone = 'left_hand';
+                document.getElementById('bone-selector').value = 'left_hand';
+                updateBoneAttachment('left_hand');
+                modifications.push('ย้ายจุดยึดเอฟเฟกต์ไปที่ **มือซ้าย (left_hand)**');
+            } else if (lower.includes('หัว') || lower.includes('ศีรษะ') || lower.includes('มงกุฎ') || lower.includes('head')) {
+                fxState.bone = 'head_crown';
+                document.getElementById('bone-selector').value = 'head_crown';
+                updateBoneAttachment('head_crown');
+                modifications.push('ย้ายตำแหน่งไปที่ **เหนือศีรษะ (head_crown)**');
+            } else if (lower.includes('รอบตัว') || lower.includes('ทั้งตัว') || lower.includes('full')) {
+                fxState.bone = 'full_body';
+                document.getElementById('bone-selector').value = 'full_body';
+                updateBoneAttachment('full_body');
+                modifications.push('ปรับขอบเขตเอฟเฟกต์ให้ **โอบล้อมทั่วทั้งร่างกาย (full_body)**');
+            } else if (lower.includes('ลำตัว') || lower.includes('อก') || lower.includes('body')) {
+                fxState.bone = 'body_core';
+                document.getElementById('bone-selector').value = 'body_core';
+                updateBoneAttachment('body_core');
+                modifications.push('ย้ายจุดศูนย์กลางมาที่ **แกนกลางลำตัว (body_core)**');
+            }
+
+            // 2. Parse Color Intent
+            if (lower.includes('ม่วง') || lower.includes('purple') || lower.includes('void')) {
+                fxState.primaryColor = '#c084fc';
+                fxState.secondaryColor = '#6b21a8';
+                fxState.colorName = 'ม่วงนีออน';
+                modifications.push('เปลี่ยนเฉดสีอนุภาคเป็น **ม่วงนีออน (#c084fc)**');
+            } else if (lower.includes('ทอง') || lower.includes('เหลือง') || lower.includes('gold')) {
+                fxState.primaryColor = '#fde047';
+                fxState.secondaryColor = '#d97706';
+                fxState.colorName = 'ทองเปล่งประกาย';
+                modifications.push('ปรับค่าสีเป็น **ทองเปล่งประกาย (#fde047)**');
+            } else if (lower.includes('แดง') || lower.includes('เพลิง') || lower.includes('ไฟ') || lower.includes('red') || lower.includes('fire')) {
+                fxState.primaryColor = '#ff4d4d';
+                fxState.secondaryColor = '#f97316';
+                fxState.colorName = 'แดงเพลิง';
+                modifications.push('ปรับสีอนุภาคเป็น **แดงเพลิง (#ff4d4d)**');
+            } else if (lower.includes('เขียว') || lower.includes('มรกต') || lower.includes('green')) {
+                fxState.primaryColor = '#34d399';
+                fxState.secondaryColor = '#059669';
+                fxState.colorName = 'เขียวมรกต';
+                modifications.push('ปรับสีอนุภาคเป็น **เขียวมรกต (#34d399)**');
+            } else if (lower.includes('ฟ้า') || lower.includes('น้ำเงิน') || lower.includes('blue') || lower.includes('cyan')) {
+                fxState.primaryColor = '#38bdf8';
+                fxState.secondaryColor = '#1d4ed8';
+                fxState.colorName = 'ฟ้าพลาสมา';
+                modifications.push('ปรับสีอนุภาคเป็น **ฟ้าพลาสมา (#38bdf8)**');
+            } else if (lower.includes('ชมพู') || lower.includes('ซากุระ') || lower.includes('pink')) {
+                fxState.primaryColor = '#f472b6';
+                fxState.secondaryColor = '#fbcfe8';
+                fxState.colorName = 'ชมพูซากุระ';
+                modifications.push('ปรับสีอนุภาคเป็น **ชมพูซากุระ (#f472b6)**');
+            }
+
+            // 3. Parse Density & Micro-Scale
+            if (lower.includes('ละเอียด') || lower.includes('สูงสุด') || lower.includes('เยอะ') || lower.includes('หนาแน่น') || lower.includes('dense')) {
+                fxState.particleCount = 5800;
+                fxState.particleSize = 0.012;
+                document.getElementById('slider-density').value = 5800;
+                document.getElementById('slider-size').value = 0.012;
+                document.getElementById('val-density').textContent = '5,800 เม็ด';
+                document.getElementById('val-size').textContent = '0.012 block';
+                modifications.push('เพิ่มความหนาแน่นเป็น **5,800 Micro-Particles** และย่อขนาดเม็ดเหลือ **0.012 blocks** เพื่อความเนียนละเอียดระดับหมอกพลังงาน');
+            } else if (lower.includes('ใหญ่') || lower.includes('ขยาย') || lower.includes('scale')) {
+                fxState.spreadRadius = Math.min(1.4, fxState.spreadRadius + 0.35);
+                fxState.particleSize = Math.min(0.038, fxState.particleSize + 0.008);
+                document.getElementById('slider-size').value = fxState.particleSize;
+                document.getElementById('val-size').textContent = `${fxState.particleSize.toFixed(3)} block`;
+                modifications.push('ขยายรัศมีการกระจายตัวของเอฟเฟกต์ให้กว้างขึ้น');
+            }
+
+            // 4. Parse Shape / Motion Pattern & Speed
+            if (lower.includes('พายุ') || lower.includes('เกลียว') || lower.includes('หมุน') || lower.includes('tornado') || lower.includes('vortex')) {
+                fxState.pattern = 'spiral_tornado';
+                modifications.push('เปลี่ยนสมการเคลื่อนที่เป็น **พายุหมุนเกลียว (Helical Vortex)**');
+            } else if (lower.includes('พุ่ง') || lower.includes('ยิง') || lower.includes('ลำแสง') || lower.includes('stream')) {
+                fxState.pattern = 'stream_jet';
+                modifications.push('เปลี่ยนรูปแบบการไหลเป็น **ลำแสงพุ่งไปข้างหน้า (Directional Jet Stream)**');
+            }
+
+            if (lower.includes('เร็ว') || lower.includes('fast')) {
+                fxState.speed = Math.min(3.0, fxState.speed + 0.8);
+                document.getElementById('slider-speed').value = fxState.speed;
+                document.getElementById('val-speed').textContent = `${fxState.speed.toFixed(1)}x`;
+                modifications.push(`เร่งความเร็วการไหลเวียนอนุภาคเป็น **${fxState.speed.toFixed(1)}x**`);
+            } else if (lower.includes('ช้า') || lower.includes('นุ่ม') || lower.includes('slow')) {
+                fxState.speed = Math.max(0.3, fxState.speed - 0.5);
+                document.getElementById('slider-speed').value = fxState.speed;
+                document.getElementById('val-speed').textContent = `${fxState.speed.toFixed(1)}x`;
+                modifications.push(`ลดความเร็วอนุภาคให้พริ้วไหวนุ่มนวลขึ้น (**${fxState.speed.toFixed(1)}x**)`);
+            }
+
+            if (modifications.length === 0) {
+                // Smart fallback enhancement
+                fxState.particleCount = Math.min(6000, fxState.particleCount + 600);
+                document.getElementById('slider-density').value = fxState.particleCount;
+                document.getElementById('val-density').textContent = `${fxState.particleCount.toLocaleString()} เม็ด`;
+                modifications.push(`ปรับจูนค่า Molang Emitter ตามคำสั่ง "${text}" และเพิ่มความละเอียดอนุภาคเป็น ${fxState.particleCount.toLocaleString()} เม็ด`);
+            }
+
+            return `ดำเนินการอัปเดตโมเดล 3D และโค้ด Bedrock JSON เรียบร้อยแล้ว:\n• ` + modifications.join('\n• ');
+        }
+
+        function appendChatMessage(sender, text) {
+            const container = document.getElementById('chat-messages');
+            const wrapper = document.createElement('div');
+            wrapper.className = sender === 'user' 
+                ? 'flex items-start justify-end space-x-2' 
+                : 'flex items-start space-x-2.5';
+
+            const formattedText = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-300 font-medium">$1</strong>')
+                .replace(/\n/g, '<br>');
+
+            if (sender === 'user') {
+                wrapper.innerHTML = `
+                    <div class="bg-blue-600/25 border border-blue-500/40 rounded-lg px-3 py-2 text-white max-w-[85%] leading-relaxed">
+                        ${formattedText}
+                    </div>
+                `;
+            } else {
+                wrapper.innerHTML = `
+                    <div class="w-7 h-7 rounded-md bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <i class="fa-solid fa-microchip text-white text-xs"></i>
+                    </div>
+                    <div class="bg-gh-bg border border-gh-border rounded-lg p-3 text-gh-text max-w-[88%] leading-relaxed shadow-sm">
+                        ${formattedText}
+                    </div>
+                `;
+            }
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ============================================================================
+        // 6. MINECRAFT BEDROCK BP & RP JSON GENERATOR + ZIP EXPORTER
+        // ============================================================================
+        function hexToRgbaArray(hex, alpha = 1.0) {
+            const clean = hex.replace('#', '');
+            const r = parseInt(clean.substring(0, 2), 16) / 255;
+            const g = parseInt(clean.substring(2, 4), 16) / 255;
+            const b = parseInt(clean.substring(4, 6), 16) / 255;
+            return [Number(r.toFixed(3)), Number(g.toFixed(3)), Number(b.toFixed(3)), alpha];
+        }
+
+        function generateBedrockFiles() {
+            const c1 = hexToRgbaArray(fxState.primaryColor, 0.95);
+            const c2 = hexToRgbaArray(fxState.secondaryColor, 0.0);
+
+            // Map bone to Minecraft Bedrock locator name
+            const locatorMap = {
+                'right_hand': 'right_item',
+                'left_hand': 'left_item',
+                'body_core': 'body',
+                'head_crown': 'head',
+                'full_body': 'root'
+            };
+            const targetLocator = locatorMap[fxState.bone] || 'body';
+
+            // 1. Resource Pack: Particle JSON (Ultra-fine sub-block micro-particles)
+            const rpParticleJson = {
+                format_version: "1.10.0",
+                particle_effect: {
+                    description: {
+                        identifier: fxState.effectName,
+                        basic_render_parameters: {
+                            material: "particles_add",
+                            texture: "textures/particle/visionfx_micro_glow"
+                        }
+                    },
+                    components: {
+                        "minecraft:emitter_rate_steady": {
+                            spawn_rate: Math.round(fxState.particleCount / 2.5),
+                            max_particles: fxState.particleCount
+                        },
+                        "minecraft:emitter_lifetime_looping": {
+                            active_time: 1.0
+                        },
+                        "minecraft:emitter_shape_sphere": {
+                            offset: [0.0, fxState.bone === 'head_crown' ? 0.45 : 0.0, 0.0],
+                            radius: fxState.bone === 'right_hand' || fxState.bone === 'left_hand' ? 0.18 : 0.55,
+                            surface_only: false,
+                            direction: fxState.pattern === 'stream_jet' ? [0, 0.2, 1] : "outwards"
+                        },
+                        "minecraft:particle_lifetime_expression": {
+                            max_lifetime: Number((0.65 / fxState.speed).toFixed(2))
+                        },
+                        "minecraft:particle_initial_speed": Number((0.85 * fxState.speed).toFixed(2)),
+                        "minecraft:particle_motion_dynamic": {
+                            linear_acceleration: fxState.pattern === 'spiral_tornado' 
+                                ? ["math.cos(variable.particle_age * 360) * 3.5", 1.8 * fxState.speed, "math.sin(variable.particle_age * 360) * 3.5"]
+                                : [0.0, 0.65 * fxState.speed, 0.0],
+                            linear_drag_coefficient: 2.5
+                        },
+                        "minecraft:particle_appearance_billboard": {
+                            size: [fxState.particleSize, fxState.particleSize],
+                            facing_camera_mode: "rotate_xyz"
+                        },
+                        "minecraft:particle_appearance_tinting": {
+                            color: {
+                                interpolant: "variable.particle_age / variable.particle_lifetime",
+                                gradient: {
+                                    "0.0": c1,
+                                    "0.65": c1,
+                                    "1.0": c2
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            // 2. Resource Pack: Animation Controller binding particle to Player Bone
+            const rpAnimController = {
+                format_version: "1.10.0",
+                animation_controllers: {
+                    "controller.animation.visionfx.player_aura": {
+                        initial_state: "active",
+                        states: {
+                            active: {
+                                particle_effects: [
+                                    {
+                                        effect: "visionfx_micro",
+                                        locator: targetLocator
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            };
+
+            // 3. Behavior Pack: Entity Trigger / Component
+            const bpEntityJson = {
+                format_version: "1.20.80",
+                "minecraft:entity": {
+                    description: {
+                        identifier: "minecraft:player",
+                        is_spawnable: false,
+                        is_summonable: false,
+                        is_experimental: false
+                    },
+                    components: {
+                        "minecraft:custom_hit_test": {
+                            hitboxes: [{ width: 0.6, height: 1.8, pivot: [0, 0.9, 0] }]
+                        }
+                    },
+                    events: {
+                        "visionfx:activate_effect": {
+                            set_property: {
+                                "visionfx:fx_active": true,
+                                "visionfx:target_bone": fxState.bone
+                            }
+                        }
+                    }
+                }
+            };
+
+            // 4. Manifests (RP & BP)
+            const rpManifest = {
+                format_version: 2,
+                header: {
+                    name: `MC-VisionFX RP (${fxState.colorName})`,
+                    description: "AI Generated Micro-Particle Resource Pack by MC-VisionFX Studio",
+                    uuid: "d4f8a1b2-3c4d-4e5f-8a9b-1c2d3e4f5a6b",
+                    version: [1, 0, 0],
+                    min_engine_version: [1, 20, 80]
+                },
+                modules: [
+                    {
+                        type: "resources",
+                        uuid: "e5f9b2c3-4d5e-4f6a-9b0c-2d3e4f5a6b7c",
+                        version: [1, 0, 0]
+                    }
+                ]
+            };
+
+            const bpManifest = {
+                format_version: 2,
+                header: {
+                    name: `MC-VisionFX BP (${fxState.colorName})`,
+                    description: "AI Generated Micro-Particle Behavior Pack by MC-VisionFX Studio",
+                    uuid: "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                    version: [1, 0, 0],
+                    min_engine_version: [1, 20, 80]
+                },
+                modules: [
+                    {
+                        type: "data",
+                        uuid: "b2c3d4e5-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                        version: [1, 0, 0]
+                    }
+                ],
+                dependencies: [
+                    {
+                        uuid: "d4f8a1b2-3c4d-4e5f-8a9b-1c2d3e4f5a6b",
+                        version: [1, 0, 0]
+                    }
+                ]
+            };
+
+            return {
+                rp_particle: JSON.stringify(rpParticleJson, null, 2),
+                rp_anim_ctrl: JSON.stringify(rpAnimController, null, 2),
+                bp_entity: JSON.stringify(bpEntityJson, null, 2),
+                rp_manifest: JSON.stringify(rpManifest, null, 2),
+                bp_manifest: JSON.stringify(bpManifest, null, 2)
+            };
+        }
+
+        function renderSelectedCodeFile() {
+            const selector = document.getElementById('code-file-selector');
+            const viewer = document.getElementById('code-viewer-content');
+            if (!selector || !viewer) return;
+            const files = generateBedrockFiles();
+            viewer.textContent = files[selector.value] || '';
+        }
+
+        function copyCurrentCode() {
+            const text = document.getElementById('code-viewer-content').textContent;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showNotification('คัดลอกโค้ด JSON ลงคลิปบอร์ดแล้ว!', 'success');
+        }
+
+        // Real ZIP Export containing Behavior_Pack and Resource_Pack folders
+        async function exportMinecraftAddon() {
+            if (typeof JSZip === 'undefined') {
+                showNotification('กำลังโหลดโมดูลบีบอัดไฟล์ กรุณาลองอีกครั้ง', 'info');
+                return;
+            }
+
+            showNotification('กำลังแพ็กเกจไฟล์ Behavior Pack (BP) และ Resource Pack (RP)...', 'info');
+            const zip = new JSZip();
+            const files = generateBedrockFiles();
+
+            // Behavior Pack Structure
+            const bpFolder = zip.folder("MC_VisionFX_BP");
+            bpFolder.file("manifest.json", files.bp_manifest);
+            bpFolder.folder("entities").file("player.json", files.bp_entity);
+
+            // Resource Pack Structure
+            const rpFolder = zip.folder("MC_VisionFX_RP");
+            rpFolder.file("manifest.json", files.rp_manifest);
+            rpFolder.folder("particles").file("visionfx_micro.particle.json", files.rp_particle);
+            rpFolder.folder("animation_controllers").file("fx.ac.json", files.rp_anim_ctrl);
+
+            // Generate a tiny 16x16 white glow PNG texture for the micro-particle in RP
+            const texCanvas = document.createElement('canvas');
+            texCanvas.width = 16;
+            texCanvas.height = 16;
+            const tCtx = texCanvas.getContext('2d');
+            const grad = tCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            tCtx.fillStyle = grad;
+            tCtx.fillRect(0, 0, 16, 16);
+
+            const blobPng = await new Promise(resolve => texCanvas.toBlob(resolve, 'image/png'));
+            rpFolder.folder("textures").folder("particle").file("visionfx_micro_glow.png", blobPng);
+
+            // README instruction file
+            zip.file("วิธีติดตั้ง_README.txt", 
+`MC-VisionFX Studio — Minecraft Bedrock Addon Export
+=====================================================
+1. นำโฟลเดอร์ MC_VisionFX_BP ไปวางใน:
+   com.mojang/behavior_packs/
+2. นำโฟลเดอร์ MC_VisionFX_RP ไปวางใน:
+   com.mojang/resource_packs/
+3. เปิดใช้งานทั้ง Behavior Pack และ Resource Pack ในการตั้งค่า World ของคุณ
+4. ตำแหน่งเอฟเฟกต์ที่ผูกไว้: ${fxState.bone} | จำนวนอนุภาค: ${fxState.particleCount} เม็ด (${fxState.particleSize} blocks)
+`);
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const downloadUrl = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `MC_VisionFX_${fxState.bone}_BP_RP.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            showNotification('ส่งออกไฟล์ BP & RP (.zip) สำเร็จพร้อมใช้งานใน Minecraft!', 'success');
+        }
+
+        // Custom Toast Notification Helper
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const borderClass = type === 'success' ? 'border-emerald-500/50 text-emerald-200' : 'border-blue-500/50 text-blue-200';
+            const iconClass = type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-info text-blue-400';
+
+            toast.className = `glass-overlay border ${borderClass} px-3.5 py-2.5 rounded-lg shadow-xl text-xs flex items-center space-x-2 transition-all duration-300 transform translate-y-0`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass}"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // ============================================================================
+        // 7. BOOTSTRAP ON WINDOW LOAD
+        // ============================================================================
+        window.onload = function() {
+            initSimVideoCanvas();
+            renderSimVideoFrame();
+            initThreeJS();
+            animate3D();
+            renderSelectedCodeFile();
+        };
+    </script>
+</body>
+</html>
